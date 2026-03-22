@@ -1,0 +1,2 @@
+mediapipe # python 3.9 - 3.12 supported
+opencv-python
