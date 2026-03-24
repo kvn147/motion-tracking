@@ -13,9 +13,20 @@ if str(PROJECT_ROOT) not in sys.path:
 from vision.camera import Camera
 from models.hand_tracker import HandTracker
 from vision.visualization import draw_landmarks, draw_debug
+from control.kinematics import calculate_finger_angles
+from control.filtering import MovingAverage
 
 cam = Camera()
 tracker = HandTracker()
+
+# Initialize moving average filters for each finger
+angle_filters = {
+    "thumb": MovingAverage(window=5),
+    "index": MovingAverage(window=5),
+    "middle": MovingAverage(window=5),
+    "ring": MovingAverage(window=5),
+    "pinky": MovingAverage(window=5)
+}
 
 prev_time = time.time()
 
@@ -31,6 +42,18 @@ while True:
 
     results = tracker.hands.detect(mp_image)
 
+    finger_angles = calculate_finger_angles(results.hand_landmarks[0]) if results.hand_landmarks else None
+    
+    # Apply moving average filter to smooth angles
+    if finger_angles:
+        filtered_angles = {}
+        for finger_name, angle in finger_angles.items():
+            if finger_name in angle_filters:
+                filtered_angles[finger_name] = angle_filters[finger_name].update(angle)
+            else:
+                filtered_angles[finger_name] = angle
+        finger_angles = filtered_angles
+
     # FPS
     curr_time = time.time()
     fps = 1 / (curr_time - prev_time)
@@ -38,7 +61,7 @@ while True:
 
     # Draw
     frame = draw_landmarks(frame, results)
-    frame = draw_debug(frame, fps=fps)
+    frame = draw_debug(frame, fps=fps, finger_angles=finger_angles)
 
     cv2.imshow("Hand Tracking Debug", frame)
 
